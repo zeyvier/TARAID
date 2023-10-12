@@ -50,3 +50,16 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# image files
+*.iso
+*.qcow2
+*.gz
+*.xz
+
+
+# database
+*.db
+
+
+share

@@ -116,6 +116,13 @@ static int ext4_fsync_journal(struct inode *inode, bool datasync,
 	return ext4_fc_commit(journal, commit_tid);
 }
 
+static struct chunk_set {
+    sector_t chunks[1024]; // 假设最多有1024个chunk
+    int count;
+};
+
+static struct chunk_set written_chunks;
+
 /*
  * akpm: A new design for ext4_sync_file().
  *
@@ -150,17 +157,36 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	}
 
 #ifdef TARAID_CROSS_TEST
+	written_chunks.count = 0;
+	sector_t chunk_size = 512; //KB per chunk
+	sector_t chunk = 0;
 	printk(KERN_INFO"TARAID: CROSS_TEST\n");
 	struct ext4_map_blocks block_map;
 	block_map.m_len = 1;
 	sector_t start_blk = start >> inode->i_blkbits;
 	sector_t end_blk = end >> inode->i_blkbits;
 	int has_error = 0;
+	printk(KERN_INFO"TARAID: CROSS_TEST Phy Block: \n");
 	for(sector_t cur_blk = start_blk; cur_blk <= end_blk; cur_blk++){
 		block_map.m_lblk = cur_blk;
 		has_error = ext4_map_blocks(NULL, inode, &block_map, 0);
-		printk(KERN_INFO"TARAID: CROSS_TEST Phy Block: %llu\n",block_map.m_pblk);
-		
+		printk(KERN_INFO"%lld ",block_map.m_pblk);
+		chunk = block_map.m_pblk / (chunk_size * 2);
+
+		int chunk_found = 0;
+        for (int i = 0; i < written_chunks.count; i++) {
+            if (written_chunks.chunks[i] == chunk) {
+                chunk_found = 1;
+                break;
+            }
+        }
+
+        // 如果当前chunk不在集合中，记录它并增加计数
+        if (!chunk_found) {
+            written_chunks.chunks[written_chunks.count] = chunk;
+            written_chunks.count++;
+        }
+		printk(KERN_INFO"\n different chunk:%lld \n",written_chunks.count);
 	}
 	if(has_error){
 		printk(KERN_INFO"TARAID: CROSS_TEST get physical block number error\n");

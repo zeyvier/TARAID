@@ -852,6 +852,28 @@ static int ext4_ioctl_checkpoint(struct file *filp, unsigned long arg)
 	return err;
 }
 
+#ifdef TARAID
+
+extern int TA_need_stat;
+
+static long ext4_TA_bkdr(struct TA_backdoor* bkdr_p)
+{
+	unsigned int bkdr_cmd = bkdr_p->backdoor_cmd;
+	switch(bkdr_cmd){
+		case TARAID_BACKDOOR_start_stat:
+			TA_need_stat = 1;
+			return 0;
+			break;
+		case TARAID_BACKDOOR_end_stat:
+			TA_need_stat = 0;
+			return 0;
+			break;
+	}
+	return -1;
+}
+
+#endif
+
 static long __ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -998,6 +1020,12 @@ mext_out:
 		fdput(donor);
 		return err;
 	}
+
+#ifdef TARAID
+	case TARAID_BACKDOOR:
+		return ext4_TA_bkdr((struct TA_backdoor*)arg);
+
+#endif
 
 	case EXT4_IOC_GROUP_ADD: {
 		struct ext4_new_group_data input;

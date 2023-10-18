@@ -116,12 +116,24 @@ static int ext4_fsync_journal(struct inode *inode, bool datasync,
 	return ext4_fc_commit(journal, commit_tid);
 }
 
+
+
+#ifdef TARAID
+
+int TA_need_stat; //this parameter should passed by ioctl
+/*
+	如果in_stat为真，则说明当前fsync由一个正在统计脏块的fsync出发，因此当前fsync直接退出
+*/
+static int in_stat = 0;
+static struct chunk_set written_chunks;
 static struct chunk_set {
     sector_t chunks[1024]; // 假设最多有1024个chunk
     int count;
 };
 
-static struct chunk_set written_chunks;
+#endif
+
+
 
 /*
  * akpm: A new design for ext4_sync_file().
@@ -156,25 +168,31 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 		goto out;
 	}
 
-#ifdef TARAID_CROSS_TEST
+#ifdef TARAID
+	if(TA_need_stat == 0 || in_stat != 0)
+		goto writeWait;
+	in_stat = 1;
+	
+	printk(KERN_INFO"TARAID: CROSS_TEST\n");
 	written_chunks.count = 0;
 	sector_t chunk_size = 512; //KB per chunk
 	sector_t chunk = 0;
-	printk(KERN_INFO"TARAID: CROSS_TEST\n");
 	struct ext4_map_blocks block_map;
 	block_map.m_len = 1;
 	sector_t start_blk = start >> inode->i_blkbits;
 	sector_t end_blk = end >> inode->i_blkbits;
 	int has_error = 0;
 	printk(KERN_INFO"TARAID: CROSS_TEST Phy Block: \n");
-	for(sector_t cur_blk = start_blk; cur_blk <= end_blk; cur_blk++){
+	sector_t cur_blk;
+	for(cur_blk = start_blk; cur_blk <= end_blk; cur_blk++){
 		block_map.m_lblk = cur_blk;
 		has_error = ext4_map_blocks(NULL, inode, &block_map, 0);
 		printk(KERN_INFO"%lld ",block_map.m_pblk);
 		chunk = block_map.m_pblk / (chunk_size * 2);
 
 		int chunk_found = 0;
-        for (int i = 0; i < written_chunks.count; i++) {
+		int i;
+        for (i = 0; i < written_chunks.count; i++) {
             if (written_chunks.chunks[i] == chunk) {
                 chunk_found = 1;
                 break;
@@ -191,9 +209,11 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	if(has_error){
 		printk(KERN_INFO"TARAID: CROSS_TEST get physical block number error\n");
 	}
+	in_stat = 0;
 
 #endif
 
+writeWait:
 	ret = file_write_and_wait_range(file, start, end);
 	if (ret)
 		goto out;

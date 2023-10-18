@@ -2,12 +2,8 @@
 #ifndef _LINUX_FS_H
 #define _LINUX_FS_H
 
-#define TARAID
+//#define TARAID
 
-#ifdef TARAID
-#define TARAID_CROSS_TEST
-
-#endif
 
 
 #include <linux/linkage.h>
@@ -80,6 +76,20 @@ struct fsverity_operations;
 struct fs_context;
 struct fs_parameter_spec;
 struct fileattr;
+
+#ifdef TARAID
+
+struct TA_backdoor
+{
+	unsigned int backdoor_cmd;
+	unsigned long backdoor_parameter;
+}
+
+
+
+#endif
+
+
 
 extern void __init inode_init(void);
 extern void __init inode_init_early(void);

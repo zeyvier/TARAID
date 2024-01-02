@@ -115,13 +115,13 @@ static struct inode *ext4_get_journal_inode(struct super_block *sb,
 #if !defined(CONFIG_EXT2_FS) && !defined(CONFIG_EXT2_FS_MODULE) && defined(CONFIG_EXT4_USE_FOR_EXT2)
 static struct file_system_type ext2_fs_type = {
 	.owner		= THIS_MODULE,
-	.name		= "ext2",
+	.name		= "tafs-ext2",
 	.mount		= ext4_mount,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
-MODULE_ALIAS_FS("ext2");
-MODULE_ALIAS("ext2");
+MODULE_ALIAS_FS("tafs-ext2");
+MODULE_ALIAS("tafs-ext2");
 #define IS_EXT2_SB(sb) ((sb)->s_bdev->bd_holder == &ext2_fs_type)
 #else
 #define IS_EXT2_SB(sb) (0)
@@ -130,13 +130,13 @@ MODULE_ALIAS("ext2");
 
 static struct file_system_type ext3_fs_type = {
 	.owner		= THIS_MODULE,
-	.name		= "ext3",
+	.name		= "tafs-ext3",
 	.mount		= ext4_mount,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
-MODULE_ALIAS_FS("ext3");
-MODULE_ALIAS("ext3");
+MODULE_ALIAS_FS("tafs-ext3");
+MODULE_ALIAS("tafs-ext3");
 #define IS_EXT3_SB(sb) ((sb)->s_bdev->bd_holder == &ext3_fs_type)
 
 
@@ -6640,12 +6640,12 @@ static inline int ext3_feature_set_ok(struct super_block *sb)
 
 static struct file_system_type ext4_fs_type = {
 	.owner		= THIS_MODULE,
-	.name		= "ext4",
+	.name		= "tafs",
 	.mount		= ext4_mount,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV | FS_ALLOW_IDMAP,
 };
-MODULE_ALIAS_FS("ext4");
+MODULE_ALIAS_FS("tafs");
 
 /* Shared across all ext4 file systems */
 wait_queue_head_t ext4__ioend_wq[EXT4_WQ_HASH_SZ];

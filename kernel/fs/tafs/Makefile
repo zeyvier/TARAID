@@ -17,7 +17,7 @@ tafs-$(CONFIG_EXT4_FS_SECURITY)		+= xattr_security.o
 tafs-$(CONFIG_FS_VERITY)		+= verity.o
 
 all:
-	make -j18 -C /lib/modules/$(shell uname -r)/build M=$(shell PWD)  modules
+	make -j8 -C /lib/modules/$(shell uname -r)/build M=$(CURDIR)  modules
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(shell PWD) clean
+	make -C /lib/modules/$(shell uname -r)/build M=$(CURDIR) clean

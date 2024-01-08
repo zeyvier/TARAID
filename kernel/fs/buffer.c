@@ -1971,6 +1971,14 @@ iomap_to_bh(struct inode *inode, sector_t block, struct buffer_head *bh,
 	}
 }
 
+/*
+ * noted by zeyvier:
+ * __block_write_begin_int: A helper function for block_write_begin. This function
+ * is specifically tailored for TARAID to extend the write path with transactional
+ * semantics. It involves copying _tx_id and _tx_flag to the buffer_head structure,
+ * thus embedding transactional information directly into the block layer write process.
+ */
+
 int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 		get_block_t *get_block, const struct iomap *iomap)
 {
@@ -1996,6 +2004,13 @@ int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 
 	for(bh = head, block_start = 0; bh != head || !block_start;
 	    block++, block_start=block_end, bh = bh->b_this_page) {
+
+#ifdef TARAID
+		if(current->_tx_id != 0){
+			bh->_tx_id = current->_tx_id;
+			TARAID_debug("copy current->_tx_id  %u to bh->_tx_id", current->_tx_id);
+		}
+#endif
 		block_end = block_start + blocksize;
 		if (block_end <= from || block_start >= to) {
 			if (PageUptodate(page)) {

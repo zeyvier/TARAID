@@ -411,6 +411,17 @@ static void io_submit_init_bio(struct ext4_io_submit *io,
 	wbc_init_bio(io->io_wbc, bio);
 }
 
+/* 
+ * Edited by zeyvier
+ * In this function, we transfer the transaction context from buffer_head to bio_vec. 
+ * The extended bio_vec includes two new members: 1. tx_id and 2. tx_flag, 
+ * which represent the transaction identifier and transaction status, respectively.
+ * To facilitate this context transfer, we implement a new function named bio_add_page_tx.
+ * This function is similar to bio_add_page but additionally passes tx_id and tx_flag.
+ * It is defined in /block/bio.c.
+ */
+
+
 static void io_submit_add_bh(struct ext4_io_submit *io,
 			     struct inode *inode,
 			     struct page *pagecache_page,
@@ -428,8 +439,14 @@ submit_and_retry:
 		io_submit_init_bio(io, bh);
 		io->io_bio->bi_write_hint = inode->i_write_hint;
 	}
+#ifdef TARAID
+	ret = bio_add_page_tx(io->io_bio, bounce_page ?: pagecache_page,
+			   bh->b_size, bh_offset(bh), current->_tx_flag);	
+#else
 	ret = bio_add_page(io->io_bio, bounce_page ?: pagecache_page,
 			   bh->b_size, bh_offset(bh));
+#endif
+
 	if (ret != bh->b_size)
 		goto submit_and_retry;
 	wbc_account_cgroup_owner(io->io_wbc, pagecache_page, bh->b_size);

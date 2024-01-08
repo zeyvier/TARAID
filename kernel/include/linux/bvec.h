@@ -29,10 +29,21 @@ struct page;
  *
  * This holds because page_is_mergeable() checks the above property.
  */
+
+/*
+    Modified by zeyvier for TARAID
+    The newly added _tx_id uniquely identifies a transaction. Pages with the same _tx_id belong to the same transaction.
+    The newly added _tx_flag member represents the write type of the transaction. _tx_flag = TARAID_CMT indicates that the current page is the last page of the transaction and also signals that the transaction needs to be committed at this point.
+*/
+
 struct bio_vec {
 	struct page	*bv_page;
 	unsigned int	bv_len;
 	unsigned int	bv_offset;
+#ifdef TARAID
+	unsigned int 	_tx_id;
+	unsigned int 	_tx_flag; 
+#endif
 };
 
 struct bvec_iter {

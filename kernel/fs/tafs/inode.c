@@ -1208,6 +1208,14 @@ retry_journal:
 		ret = ext4_block_write_begin(page, pos, len,
 					     ext4_get_block);
 #else
+
+/*
+ * noted by zeyvier:
+ * __block_write_begin is the first function in the write process that touches the block layer.
+ * In this function, the page is linked with buffer_head. During the subsequent writepages process,
+ * the semantic information in buffer_head will eventually be transferred to bio_vec and then passed to the block layer.
+ */
+
 	if (ext4_should_dioread_nolock(inode))
 		ret = __block_write_begin(page, pos, len,
 					  ext4_get_block_unwritten);

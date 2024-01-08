@@ -1017,6 +1017,68 @@ int bio_add_page(struct bio *bio, struct page *page,
 }
 EXPORT_SYMBOL(bio_add_page);
 
+/**
+ * edited by zeyvier
+ * __bio_add_page_tx - add page(s) to a bio in a new segment with transaction semantics
+ * @bio: destination bio
+ * @page: start page to add
+ * @len: length of the data to add, may cross pages
+ * @off: offset of the data relative to @page, may cross pages
+ *  @tx_id: transaction identifier
+ *  @tx_flag: transaction status
+ *
+ * Add the data at @page + @off to @bio as a new bvec.  The caller must ensure
+ * that @bio has space for another bvec.
+ */
+void __bio_add_page_tx(struct bio *bio, struct page *page,
+		unsigned int len, unsigned int off, unsigned int tx_id, unsigned int tx_flag)
+{
+	struct bio_vec *bv = &bio->bi_io_vec[bio->bi_vcnt];
+
+	WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED));
+	WARN_ON_ONCE(bio_full(bio, len));
+
+	bv->bv_page = page;
+	bv->bv_offset = off;
+	bv->bv_len = len;
+	bv->_tx_id = tx_id;
+	bv->_tx_flag = tx_flag;
+
+	bio->bi_iter.bi_size += len;
+	bio->bi_vcnt++;
+
+	if (!bio_flagged(bio, BIO_WORKINGSET) && unlikely(PageWorkingset(page)))
+		bio_set_flag(bio, BIO_WORKINGSET);
+}
+EXPORT_SYMBOL_GPL(__bio_add_page_tx);
+
+/**
+ * 	edited by zeyvier
+ *	bio_add_page_tx	-	attempt to add page(s) to bio with transaction semantics
+ *	@bio: destination bio
+ *	@page: start page to add
+ *	@len: vec entry length, may cross pages
+ *	@offset: vec entry offset relative to @page, may cross pages
+ *  @tx_id: transaction identifier
+ *  @tx_flag: transaction status
+ *
+ *	Attempt to add page(s) to the bio_vec maplist. This will only fail
+ *	if either bio->bi_vcnt == bio->bi_max_vecs or it's a cloned bio.
+ */
+int bio_add_page_tx(struct bio *bio, struct page *page,
+		 unsigned int len, unsigned int offset,unsigned int tx_id,unsigned int tx_flag)
+{
+	bool same_page = false;
+
+	if (!__bio_try_merge_page(bio, page, len, offset, &same_page)) {
+		if (bio_full(bio, len))
+			return 0;
+		__bio_add_page_tx(bio, page, len, offset, tx_id, tx_flag);
+	}
+	return len;
+}
+EXPORT_SYMBOL(bio_add_page_tx);
+
 void bio_release_pages(struct bio *bio, bool mark_dirty)
 {
 	struct bvec_iter_all iter_all;

@@ -57,6 +57,11 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
  * a page (via a page_mapping) and for wrapping bio submission
  * for backward compatibility reasons (e.g. submit_bh).
  */
+
+ /*
+  * edited by zeyvier
+  * add new member _tx_id as transaction identifier
+  */
 struct buffer_head {
 	unsigned long b_state;		/* buffer state bitmap (see above) */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
@@ -76,6 +81,10 @@ struct buffer_head {
 	spinlock_t b_uptodate_lock;	/* Used by the first bh in a page, to
 					 * serialise IO completion of other
 					 * buffers in the page */
+#ifdef TARAID
+	unsigned int _tx_id ; 	
+#endif
+
 };
 
 /*

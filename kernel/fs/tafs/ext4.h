@@ -80,6 +80,14 @@
 #define ext4_debug(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
 #endif
 
+
+
+
+#else
+#define ext4_debug(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
+
+#endif
+
  /*
   * Turn on EXT_DEBUG to enable ext4_ext_show_path/leaf/move in extents.c
   */
@@ -202,6 +210,27 @@ struct ext4_allocation_request {
 #define EXT4_MAP_BOUNDARY	BIT(BH_Boundary)
 #define EXT4_MAP_FLAGS		(EXT4_MAP_NEW | EXT4_MAP_MAPPED |\
 				 EXT4_MAP_UNWRITTEN | EXT4_MAP_BOUNDARY)
+				 
+#ifdef TARAID
+
+
+struct TA_backdoor
+{
+	unsigned int backdoor_cmd;
+	unsigned long backdoor_parameter;
+};
+
+
+/* additional command introduced by TARAID*/
+
+#define TARAID_BACKDOOR	_IOW		('f', 45, struct TA_backdoor)
+#define TARAID_BACKDOOR_BASE 		(100)
+#define TARAID_BACKDOOR_start_stat 	(TARAID_BACKDOOR_BASE + 1)
+#define TARAID_BACKDOOR_end_stat 	(TARAID_BACKDOOR_BASE + 2)
+#define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
+#define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
+
+#endif
 
 struct ext4_map_blocks {
 	ext4_fsblk_t m_pblk;
@@ -1577,6 +1606,10 @@ struct ext4_sb_info {
 	spinlock_t s_ext_stats_lock;
 	unsigned long s_ext_blocks;
 	unsigned long s_ext_extents;
+#endif
+
+#ifdef TARAID
+	atomic_t _txid_alloced;
 #endif
 
 	/* for buddy allocator */

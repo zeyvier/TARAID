@@ -2,7 +2,6 @@
 #ifndef _LINUX_FS_H
 #define _LINUX_FS_H
 
-//#define TARAID
 
 
 
@@ -77,17 +76,7 @@ struct fs_context;
 struct fs_parameter_spec;
 struct fileattr;
 
-#ifdef TARAID
 
-struct TA_backdoor
-{
-	unsigned int backdoor_cmd;
-	unsigned long backdoor_parameter;
-}
-
-
-
-#endif
 
 
 
@@ -3677,5 +3666,23 @@ static inline int inode_drain_writes(struct inode *inode)
 	inode_dio_wait(inode);
 	return filemap_write_and_wait(inode->i_mapping);
 }
+
+#ifdef TARAID_DEBUG
+
+#ifdef TARAID_DEBUG_FS
+#define TARAID_debug(f, a...)						\
+	do {								\
+		printk(KERN_DEBUG "TARAID_DEBUG FS (%s, %d): %s:",	\
+			__FILE__, __LINE__, __func__);			\
+		printk(KERN_DEBUG f, ## a);				\
+	} while (0)
+#else
+#define TARAID_debug(f, a...)						\
+	do {								\
+		printk(KERN_DEBUG "TARAID_DEBUG  (%s, %d): %s:",	\
+			__FILE__, __LINE__, __func__);			\
+		printk(KERN_DEBUG f, ## a);				\
+	} while (0)
+#endif
 
 #endif /* _LINUX_FS_H */

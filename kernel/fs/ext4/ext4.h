@@ -722,13 +722,9 @@ enum {
 #define EXT4_IOC_GET_ES_CACHE		_IOWR('f', 42, struct fiemap)
 #define EXT4_IOC_CHECKPOINT		_IOW('f', 43, __u32)
 
-/* additional command introduced by TARAID*/
 
-#ifdef TARAID
-#define TARAID_BACKDOOR		_IOW('f', 45, struct TA_backdoor)
-#define TARAID_BACKDOOR_start_stat (101)
-#define TARAID_BACKDOOR_end_stat (102)
-#endif
+
+
 
 #define EXT4_IOC_SHUTDOWN _IOR ('X', 125, __u32)
 

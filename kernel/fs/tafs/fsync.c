@@ -148,7 +148,10 @@ static struct chunk_set {
  */
 int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 {
-	printk(KERN_INFO"TARAID:	TAFS-->sync\n");
+#ifdef TARAID
+	TARAID_debug(KERN_INFO"TARAID:	TAFS-->sync\n");
+#endif
+	
 	int ret = 0, err;
 	bool needs_barrier = false;
 	struct inode *inode = file->f_mapping->host;

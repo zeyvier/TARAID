@@ -860,12 +860,12 @@ static long ext4_TA_bkdr_begin_tx(struct inode* inode)
 {
 	unsigned_int txid;
 	
-	txid = atomic_inc_return(&EXT4_SB(inode->i_sb)->_txid_alloced);
+	
 	if(current->_txid != 0){
 		TARAID_debug("Process is already in transaction return error code -1");	
 		return -1;
 	}
-	current->_txid = txid;
+	current->_txid = TARAID_alloc_new_txid(inode);
 	TARAID_debug("Attach txid: %u to current process",txid);
 	return 0;
 }
@@ -878,13 +878,14 @@ static long ext4_TA_bkdr_commit_tx(struct inode* inode)
 	}	
 
 	TARAID_debug("TRANS with txid: %u to commit",txid);
-	current->_txid = 0;
+	TARAID_clear_tx();
 	
 	return 0;	
 }
 
 static long ext4_TA_bkdr(struct inode* inode,TA_backdoor* bkdr_p)
 {
+	TARAID_debug("ext4_TA_bkdr cmd : %u",bkdr_p->backdoor_cmd);
 	unsigned int bkdr_cmd = bkdr_p->backdoor_cmd;
 	switch(bkdr_cmd){
 		case TARAID_BACKDOOR_start_stat:

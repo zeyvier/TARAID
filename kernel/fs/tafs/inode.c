@@ -2318,6 +2318,8 @@ out:
  * mapped, we update @map to the next extent in the last page that needs
  * mapping. Otherwise we submit the page for IO.
  */
+
+
 static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 {
 	struct pagevec pvec;
@@ -2353,8 +2355,30 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 			 */
 			if (err < 0 || map_bh)
 				goto out;
+
+#ifdef TARAID
+			/*
+			 * Edited by zeyvier
+			 * when it turns to the last page
+			 * if we detect that the write process is in a transaction
+			 * and this transaction need to be committed 
+			 * we'll set the flag TARAID_CMT to true and pass it
+			 * to block layer by calling bio_add_page_tx
+			 */	
+			 TARAID_debug("Set commit flag in the last traversel") ;
+			 if(start > end && i == nr_pages) {
+				current->_tx_flag |= TARAID_CMT ; 
+			 }		
+
+#endif
+
 			/* Page fully mapped - let IO run! */
 			err = mpage_submit_page(mpd, page);
+
+#ifdef TARAID
+			current->_tx_flag &= ~TARAID_CMT;
+#endif
+
 			if (err < 0)
 				goto out;
 		}

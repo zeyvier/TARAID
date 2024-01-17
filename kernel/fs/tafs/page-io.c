@@ -439,9 +439,10 @@ submit_and_retry:
 		io_submit_init_bio(io, bh);
 		io->io_bio->bi_write_hint = inode->i_write_hint;
 	}
+
 #ifdef TARAID
 	ret = bio_add_page_tx(io->io_bio, bounce_page ?: pagecache_page,
-			   bh->b_size, bh_offset(bh), current->_tx_flag);	
+			   bh->b_size, bh_offset(bh), (current->_tx_flag & TARAID_SYNC_TX )? current->_txid : bh->_txid , current->_tx_flag);	
 #else
 	ret = bio_add_page(io->io_bio, bounce_page ?: pagecache_page,
 			   bh->b_size, bh_offset(bh));

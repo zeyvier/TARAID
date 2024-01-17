@@ -230,6 +230,12 @@ struct TA_backdoor
 #define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
 #define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
 
+
+inline unsigned int TARAID_alloc_new_txid(struct inode* inode) {return &EXT4_SB(inode->i_sb)->_txid_alloced;}
+
+inline void TARAID_clear_tx() {current->_txid = 0;}
+
+
 #endif
 
 struct ext4_map_blocks {

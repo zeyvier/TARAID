@@ -3667,6 +3667,33 @@ static inline int inode_drain_writes(struct inode *inode)
 	return filemap_write_and_wait(inode->i_mapping);
 }
 
+/* 
+ * Noted by zeyvier
+ * The _tx_flag member indicates the status of a transaction. 
+ * The semantics of _tx_flags are as follows:
+ * - TARAID_CMT: This flag denotes that the current page is the final page in a transaction.
+ * - TARAID_NEED_CMT: This flag signals that the filesystem (FS) or block layer should set 
+ *   TARAID_CMT, indicating to the deeper layers of the I/O stack to initiate the commit process.
+ * - Additionally, in ext4_sync_file, the default behavior is that the last page of a file 
+ *   is considered the final page of a transaction unless TARAID_NO_CMT is set as true in tx_flag.
+ * - TARAID_NO_CMT: This flag can be used in ext4_sync_file to indicate that the last page of 
+ *   a file is not the final page of a transaction. This is applicable in scenarios where a 
+ * - TARAID_SYNC_TX: The transaction is created in a sync function , we call this transaction as
+ *   sync transaction , this transaction will be committed implicitly in the end of the sync.
+ *   transaction involves multiple files (TODO: not implemented yet).
+ */
+
+
+#ifdef TARAID
+
+
+#define TARAID_CMT 			(1 << 0)
+#define TARAID_NEED_CMT 	(1 << 1)
+#define TARAID_NO_CMT		(1 << 2)
+#define TARAID_SYNC_TX		(1 << 3)
+
+#endif
+
 #ifdef TARAID_DEBUG
 
 #ifdef TARAID_DEBUG_FS

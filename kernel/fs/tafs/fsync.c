@@ -133,6 +133,31 @@ static struct chunk_set {
 
 #endif
 
+/*
+ * Edited by zeyvier
+ * Context: Enhancements in TA-RAID for ext4_sync_file
+ *
+ * The standard ext4_sync_file synchronizes a file's dirty data and ensures crash consistency
+ * by additionally recording a WAL-like journal. In TA-RAID, we utilize the out-of-place update 
+ * mechanism of SSDs to provide atomicity and order, which are crucial for crash consistency.
+ *
+ * To this end, we introduce transaction handling in the I/O stack. We offer interfaces such as 
+ * start_tx and commit_tx for transaction control and use the task_struct 'current' to transfer
+ * transaction semantics. We have extended task_struct with two members: _tx_id and _tx_flag,
+ * whose usage is documented in /include/linux/fs.h.
+ *
+ * Regarding ext4_sync_file modifications: when the current process is not in a transaction, we 
+ * treat the sync process as atomic, allocate a new transaction ID, and pass it to the bio_vec 
+ * structure. If the current process is in a transaction (indicated by a non-zero current->_tx_id),
+ * the tx_id is passed to the buffer_head structure during ext4_write_begin. Transactions can involve 
+ * multiple files; upon commit_tx invocation, multiple fsyncs are triggered for atomicity and durability. 
+ * The final fsync in a transaction sends a commit request to the lower layer of the I/O stack. For a 
+ * transaction involving 'n' files, the TARAID_NO_CMT flag in current->_tx_flag is set to 1 until the last 
+ * file, where it's set to 0, prompting the FS to pass a commit request to the lower layer.
+ *
+ * Future implementations may support interfaces like fbarrier(fatomic), with process control via 
+ * current->_tx_id.
+ */
 
 
 /*
@@ -150,6 +175,14 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 {
 #ifdef TARAID
 	TARAID_debug(KERN_INFO"TARAID:	TAFS-->sync\n");
+	
+	if(current->_txid == 0)
+	{
+		current->_tx_flag |= TARAID_SYNC_TX;
+		current->_tx_flag |= TARAID_NEED_CMT;
+		current->_txid = TARAID_alloc_new_txid(file->f_mapping->host);
+	}
+
 #endif
 	
 	int ret = 0, err;
@@ -171,6 +204,9 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 			ret = -EROFS;
 		goto out;
 	}
+/*
+
+//edited by zeyvier : flollowing code is written to statistic the I/O amount in fsync 
 
 #ifdef TARAID
 	if(TA_need_stat == 0 || in_stat != 0)
@@ -217,10 +253,18 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 
 #endif
 
+*/
+
+
 writeWait:
 	ret = file_write_and_wait_range(file, start, end);
 	if (ret)
 		goto out;
+
+#ifdef TARAID
+	TARAID_clear_tx();
+
+#endif
 
 	/*
 	 * data=writeback,ordered:

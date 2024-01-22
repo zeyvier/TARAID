@@ -81,13 +81,6 @@
 #endif
 
 
-
-
-#else
-#define ext4_debug(fmt, ...)	no_printk(fmt, ##__VA_ARGS__)
-
-#endif
-
  /*
   * Turn on EXT_DEBUG to enable ext4_ext_show_path/leaf/move in extents.c
   */

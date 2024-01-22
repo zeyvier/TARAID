@@ -3712,4 +3712,6 @@ static inline int inode_drain_writes(struct inode *inode)
 	} while (0)
 #endif
 
+#endif
+
 #endif /* _LINUX_FS_H */

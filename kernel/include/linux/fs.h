@@ -3692,26 +3692,23 @@ static inline int inode_drain_writes(struct inode *inode)
 #define TARAID_NO_CMT		(1 << 2)
 #define TARAID_SYNC_TX		(1 << 3)
 
-#endif
+/*
+	set TARAID_DEBUG as default setting
+*/
+#define TARAID_DEBUG
+
+#endif /*TARAID*/
 
 #ifdef TARAID_DEBUG
 
-#ifdef TARAID_DEBUG_FS
-#define TARAID_debug(f, a...)						\
-	do {								\
-		printk(KERN_DEBUG "TARAID_DEBUG FS (%s, %d): %s:",	\
-			__FILE__, __LINE__, __func__);			\
-		printk(KERN_DEBUG f, ## a);				\
-	} while (0)
-#else
+
 #define TARAID_debug(f, a...)						\
 	do {								\
 		printk(KERN_DEBUG "TARAID_DEBUG  (%s, %d): %s:",	\
 			__FILE__, __LINE__, __func__);			\
 		printk(KERN_DEBUG f, ## a);				\
 	} while (0)
-#endif
+#endif /*TARAID_DEBUG*/
 
-#endif
 
 #endif /* _LINUX_FS_H */

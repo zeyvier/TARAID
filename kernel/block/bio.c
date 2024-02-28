@@ -1041,8 +1041,11 @@ void __bio_add_page_tx(struct bio *bio, struct page *page,
 	bv->bv_page = page;
 	bv->bv_offset = off;
 	bv->bv_len = len;
+
+#ifdef TARAID
 	bv->_tx_id = tx_id;
 	bv->_tx_flag = tx_flag;
+#endif
 
 	bio->bi_iter.bi_size += len;
 	bio->bi_vcnt++;

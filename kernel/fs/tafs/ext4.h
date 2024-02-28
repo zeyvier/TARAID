@@ -14,8 +14,9 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#ifndef _EXT4_H
-#define _EXT4_H
+#ifndef _TAFS_H
+#define _TAFS_H
+#define TARAID
 
 #include <linux/types.h>
 #include <linux/blkdev.h>
@@ -204,32 +205,7 @@ struct ext4_allocation_request {
 #define EXT4_MAP_FLAGS		(EXT4_MAP_NEW | EXT4_MAP_MAPPED |\
 				 EXT4_MAP_UNWRITTEN | EXT4_MAP_BOUNDARY)
 				 
-#ifdef TARAID
 
-
-struct TA_backdoor
-{
-	unsigned int backdoor_cmd;
-	unsigned long backdoor_parameter;
-};
-
-
-/* additional command introduced by TARAID*/
-
-#define TARAID_BACKDOOR	_IOW		('f', 45, struct TA_backdoor)
-#define TARAID_BACKDOOR_BASE 		(100)
-#define TARAID_BACKDOOR_start_stat 	(TARAID_BACKDOOR_BASE + 1)
-#define TARAID_BACKDOOR_end_stat 	(TARAID_BACKDOOR_BASE + 2)
-#define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
-#define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
-
-
-inline unsigned int TARAID_alloc_new_txid(struct inode* inode) {return &EXT4_SB(inode->i_sb)->_txid_alloced;}
-
-inline void TARAID_clear_tx() {current->_txid = 0;}
-
-
-#endif
 
 struct ext4_map_blocks {
 	ext4_fsblk_t m_pblk;
@@ -752,11 +728,6 @@ enum {
 
 /* additional command introduced by TARAID*/
 
-#ifdef TARAID
-#define TARAID_BACKDOOR		_IOW('f', 45, struct TA_backdoor)
-#define TARAID_BACKDOOR_start_stat (101)
-#define TARAID_BACKDOOR_end_stat (102)
-#endif
 
 #define EXT4_IOC_SHUTDOWN _IOR ('X', 125, __u32)
 
@@ -3910,6 +3881,35 @@ static inline int ext4_buffer_uptodate(struct buffer_head *bh)
 		set_buffer_uptodate(bh);
 	return buffer_uptodate(bh);
 }
+
+#ifdef TARAID
+
+
+struct TA_backdoor
+{
+	unsigned int backdoor_cmd;
+	unsigned long backdoor_parameter;
+};
+
+
+/* additional command introduced by TARAID*/
+
+#define TARAID_BACKDOOR	_IOW		('f', 45, struct TA_backdoor)
+#define TARAID_BACKDOOR_BASE 		(100)
+#define TARAID_BACKDOOR_start_stat 	(TARAID_BACKDOOR_BASE + 1)
+#define TARAID_BACKDOOR_end_stat 	(TARAID_BACKDOOR_BASE + 2)
+#define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
+#define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
+
+
+inline unsigned int TARAID_alloc_new_txid(struct inode* inode) {return &EXT4_SB(inode->i_sb)->_txid_alloced;}
+
+inline void TARAID_clear_tx(void) {
+	//current->_tx_id = 0;
+}
+
+
+#endif
 
 #endif	/* __KERNEL__ */
 

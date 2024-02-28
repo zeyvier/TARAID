@@ -214,6 +214,9 @@ struct task_struct init_task
 #ifdef CONFIG_SECCOMP_FILTER
 	.seccomp	= { .filter_count = ATOMIC_INIT(0) },
 #endif
+#ifdef TARAID
+	._tx_id = 0,
+#endif
 };
 EXPORT_SYMBOL(init_task);
 

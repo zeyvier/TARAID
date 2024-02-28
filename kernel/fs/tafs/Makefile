@@ -16,6 +16,9 @@ tafs-$(CONFIG_EXT4_FS_POSIX_ACL)	+= acl.o
 tafs-$(CONFIG_EXT4_FS_SECURITY)		+= xattr_security.o
 tafs-$(CONFIG_FS_VERITY)		+= verity.o
 
+CFLAGS += -DTARAID
+
+
 all:
 	make -j8 -C /lib/modules/$(shell uname -r)/build M=$(CURDIR)  modules
 

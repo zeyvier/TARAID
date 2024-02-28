@@ -720,9 +720,7 @@ struct kmap_ctrl {
 
 struct task_struct {
 
-#ifdef TARAID
-	unsigned int _txid;
-#endif
+
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/*
@@ -1492,6 +1490,10 @@ struct task_struct {
 	 * cores
 	 */
 	struct callback_head		l1d_flush_kill;
+#endif
+
+#ifdef TARAID
+	unsigned int _tx_id;
 #endif
 
 	/*

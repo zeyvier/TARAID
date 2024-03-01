@@ -16,7 +16,10 @@
 
 #ifndef _TAFS_H
 #define _TAFS_H
+
+#ifndef TARAID
 #define TARAID
+#endif
 
 #include <linux/types.h>
 #include <linux/blkdev.h>
@@ -2462,6 +2465,31 @@ static inline u32 ext4_chksum(struct ext4_sb_info *sbi, u32 crc,
 	return *(u32 *)desc.ctx;
 }
 
+
+struct TA_backdoor
+{
+	unsigned int backdoor_cmd;
+	unsigned long backdoor_parameter;
+};
+
+
+/* additional command introduced by TARAID*/
+
+#define TARAID_BACKDOOR	_IOW		('f', 45, struct TA_backdoor)
+#define TARAID_BACKDOOR_BASE 		(100)
+#define TARAID_BACKDOOR_start_stat 	(TARAID_BACKDOOR_BASE + 1)
+#define TARAID_BACKDOOR_end_stat 	(TARAID_BACKDOOR_BASE + 2)
+#define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
+#define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
+
+
+static inline unsigned int TARAID_alloc_new_txid(struct inode* inode) {return &EXT4_SB(inode->i_sb)->_txid_alloced;}
+
+static inline void TARAID_clear_tx(void) {
+	//current->_tx_id = 0;
+}
+
+
 #ifdef __KERNEL__
 
 /* hash info structure used by the directory hash */
@@ -3882,34 +3910,10 @@ static inline int ext4_buffer_uptodate(struct buffer_head *bh)
 	return buffer_uptodate(bh);
 }
 
-#ifdef TARAID
 
 
-struct TA_backdoor
-{
-	unsigned int backdoor_cmd;
-	unsigned long backdoor_parameter;
-};
 
 
-/* additional command introduced by TARAID*/
-
-#define TARAID_BACKDOOR	_IOW		('f', 45, struct TA_backdoor)
-#define TARAID_BACKDOOR_BASE 		(100)
-#define TARAID_BACKDOOR_start_stat 	(TARAID_BACKDOOR_BASE + 1)
-#define TARAID_BACKDOOR_end_stat 	(TARAID_BACKDOOR_BASE + 2)
-#define TARAID_BACKDOOR_BEGIN_TX 	(TARAID_BACKDOOR_BASE + 3)
-#define TARAID_BACKDOOR_COMMIT_TX 	(TARAID_BACKDOOR_BASE + 4)
-
-
-inline unsigned int TARAID_alloc_new_txid(struct inode* inode) {return &EXT4_SB(inode->i_sb)->_txid_alloced;}
-
-inline void TARAID_clear_tx(void) {
-	//current->_tx_id = 0;
-}
-
-
-#endif
 
 #endif	/* __KERNEL__ */
 

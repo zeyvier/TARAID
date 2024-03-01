@@ -176,11 +176,11 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 #ifdef TARAID
 	TARAID_debug(KERN_INFO"TARAID:	TAFS-->sync\n");
 	
-	if(current->_txid == 0)
+	if(current->_tx_id == 0)
 	{
 		current->_tx_flag |= TARAID_SYNC_TX;
 		current->_tx_flag |= TARAID_NEED_CMT;
-		current->_txid = TARAID_alloc_new_txid(file->f_mapping->host);
+		current->_tx_id = TARAID_alloc_new_txid(file->f_mapping->host);
 	}
 
 #endif

@@ -1326,6 +1326,11 @@ struct task_struct {
 	/* Start of a write-and-pause period: */
 	unsigned long			dirty_paused_when;
 
+#ifdef TARAID
+	unsigned int _tx_id;
+	unsigned int _tx_flag;
+#endif
+
 #ifdef CONFIG_LATENCYTOP
 	int				latency_record_count;
 	struct latency_record		latency_record[LT_SAVECOUNT];
@@ -1492,9 +1497,7 @@ struct task_struct {
 	struct callback_head		l1d_flush_kill;
 #endif
 
-#ifdef TARAID
-	unsigned int _tx_id;
-#endif
+
 
 	/*
 	 * New fields for task_struct should be added above here, so that

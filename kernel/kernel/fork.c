@@ -984,9 +984,10 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 
 #ifdef TARAID
 	tsk->_tx_id = 0;
-	printk(KERN_INFO"TARAID INIT txid in fork.c\n");
-#endif
+	//printk(KERN_INFO"TARAID INIT txid in fork.c\n");
+#else
 	printk(KERN_INFO"NOTA INIT txid in fork.c\n");
+#endif
 	return tsk;
 
 free_stack:

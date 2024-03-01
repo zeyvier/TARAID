@@ -858,33 +858,41 @@ extern int TA_need_stat;
 
 static long ext4_TA_bkdr_begin_tx(struct inode* inode)
 {
-	unsigned_int txid;
+	unsigned int txid;
 	
 	
-	if(current->_txid != 0){
+	if(current->_tx_id != 0){
 		TARAID_debug("Process is already in transaction return error code -1");	
 		return -1;
 	}
-	current->_txid = TARAID_alloc_new_txid(inode);
+	current->_tx_id = TARAID_alloc_new_txid(inode);
 	TARAID_debug("Attach txid: %u to current process",txid);
 	return 0;
 }
 
 static long ext4_TA_bkdr_commit_tx(struct inode* inode)
 {
-	if(current->_txid == 0){
+	if(current->_tx_id == 0){
 	 	TARAID_debug("Process is not in transaction, return error code -1");	
 		return -1;	
 	}	
 
-	TARAID_debug("TRANS with txid: %u to commit",txid);
+	TARAID_debug("TRANS with txid: %u to commit",current->_tx_id);
 	TARAID_clear_tx();
 	
 	return 0;	
 }
 
-static long ext4_TA_bkdr(struct inode* inode,TA_backdoor* bkdr_p)
+static long ext4_TA_bkdr(struct inode* inode,struct TA_backdoor* bkdr_p_usr)
 {
+	struct TA_backdoor bkdr;
+	struct TA_backdoor* bkdr_p = &bkdr;
+
+	if (copy_from_user(&bkdr, bkdr_p_usr, sizeof(struct TA_backdoor))) {
+		TARAID_debug("copy TA CMD error\n");
+        return -EFAULT; 
+    }
+	
 	TARAID_debug("ext4_TA_bkdr cmd : %u",bkdr_p->backdoor_cmd);
 	unsigned int bkdr_cmd = bkdr_p->backdoor_cmd;
 	switch(bkdr_cmd){
@@ -1058,7 +1066,7 @@ mext_out:
 	}
 	case TARAID_BACKDOOR: {
 #ifdef TARAID
-		return ext4_TA_bkdr(inode,(struct TA_backdoor*)arg);
+		return ext4_TA_bkdr(inode,(struct TA_backdoor*) arg);
 #else
 		printk(KERN_INFO"TARAID_BACKDOOR without TARAID defination\n");
 		return 0;

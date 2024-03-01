@@ -20,7 +20,7 @@ CFLAGS += -DTARAID
 
 
 all:
-	make -j8 -C /lib/modules/$(shell uname -r)/build M=$(CURDIR)  modules
+	make -j20 -C /lib/modules/$(shell uname -r)/build M=$(CURDIR)  modules
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(CURDIR) clean

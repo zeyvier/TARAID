@@ -2,6 +2,7 @@
 #ifndef _RAID5_H
 #define _RAID5_H
 
+#include <cstddef>
 #include <linux/raid/xor.h>
 #include <linux/dmaengine.h>
 
@@ -266,6 +267,10 @@ struct stripe_head {
 		sector_t	sector;			/* sector of this page */
 		unsigned long	flags;
 		u32		log_checksum;
+#ifdef TARAID
+		unsigned int _tx_id;
+		unsigned int _tx_flag;
+#endif
 		unsigned short	write_hint;
 	} dev[1]; /* allocated with extra space depending of RAID geometry */
 };
@@ -561,6 +566,7 @@ struct r5pending_data {
 
 struct r5conf {
 	struct hlist_head	*stripe_hashtbl;
+	struct hlist_head	*tx_hash_table;
 	/* only protect corresponding hash list and inactive_list */
 	spinlock_t		hash_locks[NR_STRIPE_HASH_LOCKS];
 	struct mddev		*mddev;
@@ -810,4 +816,194 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 			int previous, int noblock, int noquiesce);
 extern int raid5_calc_degraded(struct r5conf *conf);
 extern int r5c_journal_mode_set(struct mddev *mddev, int journal_mode);
+
+#define R5_TX_BUCKETS (1024)
+
+#define TARAID
+
+
+#ifdef TARAID
+
+/* 
+ * Following FLAGs are shared among multiple layers, we need to 
+ * ensure that the consistensy of the flags in these files:
+ * 1. /include/linux/fs.h
+ * 2. /drivers/md/raid5.h
+*/
+
+#define TARAID_CMT 			(1 << 0)
+#define TARAID_NEED_CMT 	(1 << 1)
+#define TARAID_NO_CMT		(1 << 2)
+#define TARAID_SYNC_TX		(1 << 3)
+
+
+#define TARAID_DEBUG_RAID 
+#ifdef TARAID_DEBUG_RAID
+
+#define TARAID_debug(f, a...)						\
+	do {								\
+		printk(KERN_DEBUG "TARAID_DEBUG_RAID  (%s, %d): %s:",	\
+			__FILE__, __LINE__, __func__);			\
+		printk(KERN_DEBUG f, ## a);				\
+	} while (0)
+
+#endif /*TARAID_DEBUG_RAID*/
+
+#define R5_TX_FLAG_COMMIT (1 << 30)
+
+struct r5_tx_header
+{
+	unsigned int _tx_id;
+	unsigned int _completed;
+	unsigned int _tot;
+	struct hlist_node _node;
+	struct bio_list bio_list;
+};
+
+static inline unsigned int r5_tx_hash(unsigned int tx_id)
+{
+	return tx_id % R5_TX_BUCKETS;
+}
+
+static inline void r5_tx_header_init(struct r5_tx_header *header) {
+    header->_tx_id = 0;
+    header->_completed = 0;
+    header->_tot = 0;
+    INIT_HLIST_NODE(&header->_node);
+    bio_list_init(&header->bio_list); 
+}
+
+
+static inline struct r5_tx_header *r5_tx_find(struct hlist_head*r5_tx_hash_table,unsigned int tx_id)
+{
+    unsigned int hash = r5_tx_hash(tx_id);
+    struct r5_tx_header *entry;
+
+    hlist_for_each_entry(entry, &r5_tx_hash_table[hash], _node) {
+        if (entry->_tx_id == tx_id)
+            return entry;
+    }
+    return NULL;
+}
+
+static inline void r5_tx_modify_stat(struct hlist_head*r5_tx_hash_table,unsigned int tx_id, unsigned int completed, unsigned int tot)
+{
+    struct r5_tx_header *entry = r5_tx_find(r5_tx_hash_table,tx_id);
+    if (entry) {
+        entry->_completed = completed;
+        entry->_tot = tot;
+    }
+}
+
+static inline void r5_tx_delete(struct hlist_head*r5_tx_hash_table,unsigned int tx_id)
+{
+    struct r5_tx_header *entry = r5_tx_find(r5_tx_hash_table, tx_id);
+    if (entry) {
+        struct bio *bio, *next;
+
+        // 释放bio_list中的所有bio
+        bio_list_for_each_safe(bio, next, &entry->bio_list) {
+            bio_put(bio);  // 假设使用bio_put来释放bio，根据实际情况调整
+        }
+
+        // 从哈希表中删除条目并释放内存
+        hlist_del(&entry->_node);
+        kfree(entry);
+    }
+}
+
+
+static inline struct r5_tx_header * r5_tx_insert(struct hlist_head*r5_tx_hash_table, unsigned int tx_id, unsigned int completed, unsigned int tot)
+{
+    unsigned int hash = r5_tx_hash(tx_id);
+    struct r5_tx_header *new_entry;
+
+    // 检查是否已经存在具有相同tx_id的条目
+    if (r5_tx_find(r5_tx_hash_table, tx_id) != NULL) {
+        return NULL; // 返回错误，表示条目已存在
+    }
+
+    // 分配新的r5_tx_header结构体
+    new_entry = kmalloc(sizeof(*new_entry), GFP_KERNEL);
+    if (!new_entry) {
+        return NULL; // 返回错误，表示内存分配失败
+    }
+
+	r5_tx_header_init(new_entry);
+    // 填充结构体字段
+    new_entry->_tx_id = tx_id;
+    new_entry->_completed = completed;
+    new_entry->_tot = tot;
+
+    // 将新条目添加到哈希表中
+    hlist_add_head(&new_entry->_node, &r5_tx_hash_table[hash]);
+
+    return new_entry; // 返回成功
+}
+
+/*
+ * This is a preliminary implementation that uses the 30th bit as an indicator of the transaction commit status.
+ * In the RAID layer, the transaction status can be in the following states:
+ * 
+ * - Uncommitted: The upper layer has not yet passed the commit bio. This means the transaction is still open
+ *   and ongoing, and we should not conclude any bios associated with this transaction.
+ * 
+ * - Committed but Unfinished: The upper layer has passed the commit bio, indicating that the transaction has
+ *   been marked for completion, but it is not yet finished. Therefore, we should not conclude any bios of the
+ *   transaction until it is fully completed.
+ * 
+ * - Finished but Uncheckpointed: The I/O operations have been completed by the storage device, and the bios
+ *   contained in the transaction can be safely concluded. However, there are still some transaction metadata
+ *   retained in the transactional block device. Such metadata needs to be cleared after receiving a checkpoint
+ *   signal from the host.
+ * 
+ * - Checkpointed: The checkpoint signal has been received from the host to the device, and the transaction is
+ *   finalized.
+ */
+
+
+static inline int r5_tx_header_is_committed(struct r5_tx_header* tx_header)
+{
+	return tx_header->_tot & R5_TX_FLAG_COMMIT;
+}
+
+static inline void r5_tx_header_set_commit(struct r5_tx_header* tx_header, int is_commit)
+{
+	if(is_commit) {tx_header->_tot |= R5_TX_FLAG_COMMIT;}
+	else	{tx_header->_tot &= R5_TX_FLAG_COMMIT;}
+}
+
+static inline int r5_tx_add_bio2txid(struct hlist_head*r5_tx_hash_table, unsigned int tx_id, struct bio *bio)
+{
+    unsigned int hash = r5_tx_hash(tx_id);
+    struct r5_tx_header *entry;
+
+    // 查找或创建对应的r5_tx_header条目
+    entry = r5_tx_find(r5_tx_hash_table, tx_id);
+    if (!entry) {
+        // 如果不存在，创建新的条目
+        entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+        if (!entry) {
+            return -ENOMEM; // 返回错误，表示内存分配失败
+        }
+
+        // 初始化新条目
+        entry->_tx_id = tx_id;
+        entry->_completed = 0;
+        entry->_tot = 0;
+        bio_list_init(&entry->bio_list);
+        INIT_HLIST_NODE(&entry->_node);
+
+        // 将新条目添加到哈希表中
+        hlist_add_head(&entry->_node, &r5_tx_hash_table[hash]);
+    }
+
+    // 将bio添加到条目的bio_list中
+    bio_list_add(&entry->bio_list, bio);
+
+    return 0; // 返回成功
+}
+
+#endif /* TARAID */
+
 #endif

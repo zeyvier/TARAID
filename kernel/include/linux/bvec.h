@@ -102,6 +102,14 @@ struct bvec_iter_all {
 	(mp_bvec_iter_page((bvec), (iter)) +			\
 	 mp_bvec_iter_page_idx((bvec), (iter)))
 
+//TODO 是否能将txid转换为bio_vec中的数组变量
+
+#define bvec_iter_tx_id(bvec, iter)				\
+	(&(bvec)->_tx_id)
+
+#define bvec_iter_tx_flag(bvec, iter)				\
+	(&(bvec)->_tx_flag)
+
 #define bvec_iter_bvec(bvec, iter)				\
 ((struct bio_vec) {						\
 	.bv_page	= bvec_iter_page((bvec), (iter)),	\

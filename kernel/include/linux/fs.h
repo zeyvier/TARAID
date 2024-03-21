@@ -3687,6 +3687,13 @@ static inline int inode_drain_writes(struct inode *inode)
 #ifdef TARAID
 
 
+/* 
+ * Following FLAGs are shared among multiple layers, we need to 
+ * ensure that the consistensy of the flags in these files:
+ * 1. /include/linux/fs.h
+ * 2. /drivers/md/raid5.h
+*/
+
 #define TARAID_CMT 			(1 << 0)
 #define TARAID_NEED_CMT 	(1 << 1)
 #define TARAID_NO_CMT		(1 << 2)
@@ -3695,20 +3702,21 @@ static inline int inode_drain_writes(struct inode *inode)
 /*
 	set TARAID_DEBUG as default setting
 */
-#define TARAID_DEBUG
+#define TARAID_DEBUG_FS
 
 #endif /*TARAID*/
 
-#ifdef TARAID_DEBUG
+#ifdef TARAID_DEBUG_FS
 
 
 #define TARAID_debug(f, a...)						\
 	do {								\
-		printk(KERN_DEBUG "TARAID_DEBUG  (%s, %d): %s:",	\
+		printk(KERN_DEBUG "TARAID_DEBUG_FS  (%s, %d): %s:",	\
 			__FILE__, __LINE__, __func__);			\
 		printk(KERN_DEBUG f, ## a);				\
 	} while (0)
-#endif /*TARAID_DEBUG*/
+
+#endif /*TARAID_DEBUG_FS*/
 
 
 #endif /* _LINUX_FS_H */

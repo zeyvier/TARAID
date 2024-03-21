@@ -35,6 +35,8 @@
  * miss any bits.
  */
 
+#include <cstddef>
+#include <cstdlib>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
@@ -1076,6 +1078,7 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 		struct bio *bi, *rbi;
 		struct md_rdev *rdev, *rrdev = NULL;
 
+		//设置io flag
 		sh = head_sh;
 		if (test_and_clear_bit(R5_Wantwrite, &sh->dev[i].flags)) {
 			op = REQ_OP_WRITE;
@@ -1095,6 +1098,8 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 			op_flags |= REQ_SYNC;
 
 again:
+
+		// req是当前设备正在执行的bio
 		bi = &sh->dev[i].req;
 		rbi = &sh->dev[i].rreq; /* For writing to replacement */
 
@@ -2856,6 +2861,17 @@ static void raid5_end_write_request(struct bio *bi)
 				set_bit(R5_ReWrite, &sh->dev[i].flags);
 		}
 	}
+
+	/*
+	 *
+	 *	在 Linux MD RAID 模块中，rdev->nr_pending 是一个计数器，
+	 *  用于跟踪当前在 RAID 成员设备 rdev 上待处理的 I/O 请求的数量。
+	 *  每当有一个新的 I/O 请求被分派到该设备时，这个计数器就会增加；
+	 *  当一个请求完成时，计数器就会减少。
+	 *
+	 * 这个计数器的主要用途是帮助 RAID 代码管理和优化对成员设备的 I/O 访问。
+	 *
+	 */
 	rdev_dec_pending(rdev, conf->mddev);
 
 	if (sh->batch_head && bi->bi_status && !replacement)
@@ -3426,10 +3442,10 @@ static int add_stripe_bio(struct stripe_head *sh, struct bio *bi, int dd_idx,
 		bip = &sh->dev[dd_idx].toread;
 	while (*bip && (*bip)->bi_iter.bi_sector < bi->bi_iter.bi_sector) {
 		if (bio_end_sector(*bip) > bi->bi_iter.bi_sector)
-			goto overlap;
+			goto overlap; //bip cover bi
 		bip = & (*bip)->bi_next;
 	}
-	if (*bip && (*bip)->bi_iter.bi_sector < bio_end_sector(bi))
+	if (*bip && (*bip)->bi_iter.bi_sector < bio_end_sector(bi)) //bi cover bi
 		goto overlap;
 
 	if (forwrite && raid5_has_ppl(conf)) {
@@ -3466,6 +3482,10 @@ static int add_stripe_bio(struct stripe_head *sh, struct bio *bi, int dd_idx,
 		clear_bit(STRIPE_BATCH_READY, &sh->state);
 
 	BUG_ON(*bip && bi->bi_next && (*bip) != bi->bi_next);
+
+	// bip 为一个二级指针结构，指向某个bio的bi_next成员
+	// 如果bip存在，则说明bio<bi<bip，因此通过 bi->bi_next = *bip , *bip = bi
+	// 可以生成一个bio->bi->bip的链条
 	if (*bip)
 		bi->bi_next = *bip;
 	*bip = bi;
@@ -3992,7 +4012,15 @@ returnbi:
 					dev->sector + RAID5_STRIPE_SECTORS(conf)) {
 					wbi2 = r5_next_bio(conf, wbi, dev->sector);
 					md_write_end(conf->mddev);
+#ifdef TARAID
+//step 1:  	判断bio是否属于某个事务
+
+//step 2:  	如果是, 则将其加入事务链表
+
+//			否则,走io结束流程
+#else
 					bio_endio(wbi);
+#endif
 					wbi = wbi2;
 				}
 				md_bitmap_endwrite(conf->mddev->bitmap, sh->sector,
@@ -4958,6 +4986,11 @@ static void handle_stripe(struct stripe_head *sh)
 	       " to_write=%d failed=%d failed_num=%d,%d\n",
 	       s.locked, s.uptodate, s.to_read, s.to_write, s.failed,
 	       s.failed_num[0], s.failed_num[1]);
+
+	printk(KERN_INFO"TARAID_debug in handle_stripe locked=%d uptodate=%d to_read=%d"
+	       " to_write=%d failed=%d failed_num=%d,%d\n",
+	       s.locked, s.uptodate, s.to_read, s.to_write, s.failed,
+	       s.failed_num[0], s.failed_num[1]);
 	/*
 	 * check if the array has lost more than max_degraded devices and,
 	 * if so, some requests might need to be failed.
@@ -5232,9 +5265,9 @@ finish:
 					md_error(conf->mddev, rdev);
 				rdev_dec_pending(rdev, conf->mddev);
 			}
-			if (test_and_clear_bit(R5_MadeGood, &dev->flags)) {
-				rdev = conf->disks[i].rdev;
-				rdev_clear_badblocks(rdev, sh->sector,
+			if (test_and_clear_bit(R5_Made.rdev;
+				rdev_clear_badbGood, &dev->flags)) {
+				rdev = conf->disks[i]locks(rdev, sh->sector,
 						     RAID5_STRIPE_SECTORS(conf), 0);
 				rdev_dec_pending(rdev, conf->mddev);
 			}
@@ -5775,7 +5808,8 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 	bool do_prepare;
 	bool do_flush = false;
 
-	if (unlikely(bi->bi_opf & REQ_PREFLUSH)) {
+	//preflush意指预刷写, 开始执行包含preflush的bio前, 需要保障前序I/O已经执行完成
+	if (unlikely(bi->bi_opf & REQ_PREFLUSH)) { 
 		int ret = log_handle_flush_request(conf, bi);
 
 		if (ret == 0)
@@ -5812,18 +5846,44 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 		return true;
 	}
 
+	
 	logical_sector = bi->bi_iter.bi_sector & ~((sector_t)RAID5_STRIPE_SECTORS(conf)-1);
 	last_sector = bio_end_sector(bi);
 	bi->bi_next = NULL;
 
 	md_account_bio(mddev, &bi);
 	prepare_to_wait(&conf->wait_for_overlap, &w, TASK_UNINTERRUPTIBLE);
+
+/*
+ * edited by zeyvier , modified in Thu May 7 24
+ * In the filesystem layer , we attach transaction id and transaction flag on 
+ * the bio->bi_vec , here we extract this two transaction semantics
+ * and pass them to stripe_head
+*/
+
+/*
+ * 默认遍历粒度为RAID5_STRIPE_SECTORS(conf)页(4KB), 事务语义此时附着在bio的bi_vec上, 
+ * 遍历过程需要随着切片操作开展, 遍历使用bio_vec迭代器方法实现, 为此执行以下修改
+ * raid层
+ *		遍历时, 提取事务语义信息, 并将其附到stripe_head上
+ * bio层
+ * 		加入能提取事务语义信息的遍历宏
+ */
+
+#ifdef TARAID
+	struct bio_vec* bi_vec = bi->bi_io_vec;
+	struct bvec_iter bi_iter = bi->bi_iter;
+	unsigned int cur_tx_id, cur_tx_flag;
+#endif
+	
+
 	for (; logical_sector < last_sector; logical_sector += RAID5_STRIPE_SECTORS(conf)) {
 		int previous;
 		int seq;
 
 		do_prepare = false;
 	retry:
+
 		seq = read_seqcount_begin(&conf->gen_lock);
 		previous = 0;
 		if (do_prepare)
@@ -5866,6 +5926,44 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 		sh = raid5_get_active_stripe(conf, new_sector, previous,
 				       (bi->bi_opf & REQ_RAHEAD), 0);
 		if (sh) {
+#define TARAID
+#ifdef TARAID
+		cur_tx_id = bvec_iter_tx_id(bi_vec, bi_iter);
+		cur_tx_flag = bvec_iter_tx_flag(bi_vec, bi_iter);
+		unsigned iter_bytes =   RAID5_STRIPE_SECTORS(conf) << 9;
+		struct hlist_head*r5_tx_hash_table = conf->tx_hash_table;
+		
+		bvec_iter_advance(bi_vec, &bi_iter,iter_bytes);
+		if(cur_tx_id != 0){
+/* step1: attach tx_info to stripe */
+			TARAID_debug("make_request :attach tx info to stripe,tx:%u,flag:%u\n",cur_tx_id,cur_tx_flag);
+			sh->dev[dd_idx]._tx_id = cur_tx_id;
+			sh->dev[dd_idx]._tx_flag = cur_tx_flag;
+
+/* step2: judge whether there exists the header of current transaction whthin transaction table 
+		  if header doesn't exist , allocate and init new header
+*/
+			struct r5_tx_header* tx_header = r5_tx_find(cur_tx_id);
+			if(tx_header == NULL)
+			{
+				TARAID_debug("new tx arriving, allocate new tx header\n");
+				tx_header = r5_tx_insert(r5_tx_hash_table,cur_tx_id, 0, 0);
+			}
+
+/* step3: statistic how many pages are contained in the transaction modify transaction header 
+		  if we receive a commit bio , we set the to_submit attribute of the tx header
+*/
+			tx_header->_tot += iter_bytes << 12;
+			TARAID_debug("tx_header add tot, txid:%u tot %u\n" ,tx_header->_tx_id,tx_header->_tot);
+
+			if(cur_tx_flag & TARAID_CMT)
+			{
+				TARAID_debug("received commit bio, tx_id:%u \n", cur_tx_id);
+				r5_tx_header_set_commit(tx_header, 1);
+			}
+		}
+#endif
+
 			if (unlikely(previous)) {
 				/* expansion might have moved on while waiting for a
 				 * stripe, so we must do the range check again.
@@ -7281,6 +7379,26 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	if (ret)
 		goto abort;
 	conf->mddev = mddev;
+
+//#define TARAID
+#ifdef TARAID
+
+/*
+ * Added by zeyvier
+ * Init transaction hash table
+ */
+
+	unsigned int buk_cnt = R5_TX_BUCKETS;
+	conf->tx_hash_table = kzalloc(buk_cnt * sizeof(struct hlist_head), GFP_KERNEL);
+	if(conf->tx_hash_table == NULL)
+		goto abort;
+
+	for (int i = 0; i < buk_cnt; i++) {
+    	INIT_HLIST_HEAD(&conf->tx_hash_table[i]);
+	}
+
+
+#endif
 
 	if ((conf->stripe_hashtbl = kzalloc(PAGE_SIZE, GFP_KERNEL)) == NULL)
 		goto abort;

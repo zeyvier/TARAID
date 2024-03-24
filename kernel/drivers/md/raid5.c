@@ -4013,6 +4013,7 @@ returnbi:
 					wbi2 = r5_next_bio(conf, wbi, dev->sector);
 					md_write_end(conf->mddev);
 #ifdef TARAID
+					TARAID_debug("endio in clean event\n");
 //step 1:  	判断bio是否属于某个事务
 					struct bvec_iter iter;
 					struct bio_vec	 bv;
@@ -6102,10 +6103,10 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 		
 	}else {
 //			否则,走io结束流程
-		bio_endio(wbi);	
+		bio_endio(bi);	
 	}
 #else
-	bio_endio(wbi);
+	bio_endio(bi);
 #endif
 	
 	return true;

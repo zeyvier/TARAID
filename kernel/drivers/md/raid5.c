@@ -4014,10 +4014,42 @@ returnbi:
 					md_write_end(conf->mddev);
 #ifdef TARAID
 //step 1:  	判断bio是否属于某个事务
-
+					struct bvec_iter iter;
+					struct bio_vec	 bv;
+					unsigned int cur_tx_id = 0;
+					unsigned int bytes = 0, pg_cnt = 0;
+					struct r5_tx_header* tx_header;
+					bio_for_each_segment(bv, wbi, iter) {
+						cur_tx_id = bvec_iter_tx_id(bv, iter); 
+						if(cur_tx_id) {
+							bytes += 1 << 9;
+						}
+					}
+					if(cur_tx_id) {
 //step 2:  	如果是, 则将其加入事务链表
+						pg_cnt = bytes >> 3; /* Assume page size is 4K*/
+						tx_header = r5_tx_find(conf->tx_hash_table, cur_tx_id);
+						tx_header->_completed += pg_cnt;
+						r5_tx_header_add_bio(tx_header,wbi);
+						if(r5_tx_header_is_committed(tx_header)&&tx_header->_completed==tx_header->_tot){
+//step 3:	如果事务已经完全结束, 则将事务对应的bio全部返回
+							TARAID_debug("TX cmt, txid: %u,pg_cnt:%u \n", cur_tx_id, tx_header->_tot);
+							r5_tx_header_end(tx_header);
 
+/* 
+ * step 4: 	TODO 加入checkpoint 逻辑, 向底层盘发送事务结束信号, 
+ * 此处存在一处优化空间,  即最新的页已经缓存到了pagecache中, 因此
+ * 读页面总能读到最新的页面, 因此, checkpoint并不紧迫, 可以收集若干
+ * 事务结束信号后, 向底层各盘传递checkpoint 命令
+ */
+							//TODO checkpoint + 结束事务处理
+
+						}
+						
+					}else {
 //			否则,走io结束流程
+						bio_endio(wbi);	
+					}
 #else
 					bio_endio(wbi);
 #endif
@@ -6031,7 +6063,51 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 
 	if (rw == WRITE)
 		md_write_end(mddev);
-	bio_endio(bi);
+	
+
+	TARAID_debug("bio end io in make_request\n");
+#ifdef TARAID
+//step 1:  	判断bio是否属于某个事务
+	struct bvec_iter iter;
+	struct bio_vec	 bv;
+	unsigned int cur_tx_id = 0;
+	unsigned int bytes = 0, pg_cnt = 0;
+	struct r5_tx_header* tx_header;
+	bio_for_each_segment(bv, bi, iter) {
+		cur_tx_id = bvec_iter_tx_id(bv, iter); 
+		if(cur_tx_id) {
+			bytes += 1 << 9;
+		}
+	}
+	if(cur_tx_id) {
+//step 2:  	如果是, 则将其加入事务链表
+		pg_cnt = bytes >> 3; /* Assume page size is 4K*/
+		tx_header = r5_tx_find(conf->tx_hash_table, cur_tx_id);
+		tx_header->_completed += pg_cnt;
+		r5_tx_header_add_bio(tx_header,bi);
+		if(r5_tx_header_is_committed(tx_header)&&tx_header->_completed==tx_header->_tot){
+//step 3:	如果事务已经完全结束, 则将事务对应的bio全部返回
+		TARAID_debug("TX cmt, txid: %u,pg_cnt:%u \n", cur_tx_id, tx_header->_tot);
+		r5_tx_header_end(tx_header);
+
+/* 
+ * step 4: 	TODO 加入checkpoint 逻辑, 向底层盘发送事务结束信号, 
+ * 此处存在一处优化空间,  即最新的页已经缓存到了pagecache中, 因此
+ * 读页面总能读到最新的页面, 因此, checkpoint并不紧迫, 可以收集若干
+ * 事务结束信号后, 向底层各盘传递checkpoint 命令
+ */
+			//TODO checkpoint + 结束事务处理
+
+		}
+		
+	}else {
+//			否则,走io结束流程
+		bio_endio(wbi);	
+	}
+#else
+	bio_endio(wbi);
+#endif
+	
 	return true;
 }
 

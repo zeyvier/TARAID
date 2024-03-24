@@ -973,6 +973,11 @@ static inline void r5_tx_header_set_commit(struct r5_tx_header* tx_header, int i
 	else	{tx_header->_tot &= R5_TX_FLAG_COMMIT;}
 }
 
+static inline void r5_tx_header_add_bio(struct r5_tx_header*header, struct bio *bio)
+{
+	bio_list_add(&header->bio_list, bio);	
+}
+
 static inline int r5_tx_add_bio2txid(struct hlist_head*r5_tx_hash_table, unsigned int tx_id, struct bio *bio)
 {
     unsigned int hash = r5_tx_hash(tx_id);
@@ -1002,6 +1007,14 @@ static inline int r5_tx_add_bio2txid(struct hlist_head*r5_tx_hash_table, unsigne
     bio_list_add(&entry->bio_list, bio);
 
     return 0; // 返回成功
+}
+
+static inline void r5_tx_header_end(struct r5_tx_header *tx_header)
+{
+	struct bio *bio;
+	bio_list_for_each(bio, &tx_header->bio_list){
+		bio_endio(bio);
+	}
 }
 
 #endif /* TARAID */
